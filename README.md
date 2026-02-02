@@ -72,4 +72,4 @@ curl -X POST http://localhost:3000/api/send/text \
 - Usa `google-tts-api`; requer acesso externo à Google Translate. Se receber 403/500, tente novamente ou verifique conectividade.
 
 ## Licença
-ISC (padrão do projeto). Ajuste conforme necessário.
+ISC OpenSource.
