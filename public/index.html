@@ -1,0 +1,780 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WaConnect</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"
+    crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: rgba(255, 255, 255, 0.04);
+      --panel-strong: rgba(255, 255, 255, 0.06);
+      --border: rgba(255, 255, 255, 0.12);
+      --text: #e8eeff;
+      --muted: #9fb4ff;
+      --accent: #7c3aed;
+      --accent-soft: rgba(124, 58, 237, 0.22);
+      --success: #2ecc71;
+      --warning: #f5b041;
+      --danger: #e74c3c;
+      --radius: 14px;
+      --shadow: 0 18px 36px rgba(0, 0, 0, 0.35);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Inter", system-ui, -apple-system, sans-serif;
+      background:
+        radial-gradient(circle at 18% 18%, rgba(92, 142, 255, 0.18), transparent 32%),
+        radial-gradient(circle at 80% 8%, rgba(129, 92, 255, 0.20), transparent 34%),
+        radial-gradient(circle at 30% 80%, rgba(92, 255, 230, 0.12), transparent 38%),
+        linear-gradient(180deg, #0b1020 0%, #0a1023 50%, #0c1228 100%);
+      color: var(--text);
+      min-height: 100vh;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    body.login-mode {
+      background:
+        radial-gradient(circle at 18% 18%, rgba(92, 142, 255, 0.18), transparent 32%),
+        radial-gradient(circle at 80% 8%, rgba(129, 92, 255, 0.20), transparent 34%),
+        radial-gradient(circle at 30% 80%, rgba(92, 255, 230, 0.12), transparent 38%),
+        linear-gradient(180deg, #310a8f 0%, #0a1023 50%, #761ee6 100%);
+      color: var(--text);
+    }
+
+    body.login-mode::before,
+    body.login-mode::after {
+      content: "";
+      position: absolute;
+      width: 520px;
+      height: 520px;
+      filter: blur(90px);
+      opacity: 0.35;
+      z-index: 0;
+      animation: float 16s ease-in-out infinite alternate;
+    }
+
+    body.login-mode::before {
+      background: #3b82f6;
+      top: -120px;
+      left: -180px;
+    }
+
+    body.login-mode::after {
+      background: #7c3aed;
+      bottom: -160px;
+      right: -140px;
+      animation-duration: 18s;
+    }
+
+    @keyframes float {
+      from {
+        transform: translateY(0px) translateX(0px);
+      }
+
+      to {
+        transform: translateY(30px) translateX(20px) scale(1.05);
+      }
+    }
+
+    a {
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    /* Login */
+    #login-screen {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 32px 16px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .login-card {
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 22px;
+      box-shadow: 0 20px 60px rgba(8, 12, 32, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+      max-width: 520px;
+      width: 100%;
+      padding: 38px 34px;
+      backdrop-filter: blur(16px);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .login-card::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.18), transparent 40%),
+        radial-gradient(circle at 80% 0%, rgba(124, 58, 237, 0.16), transparent 38%);
+      pointer-events: none;
+    }
+
+    .login-logo {
+      width: 120px;
+      height: 120px;
+      border-radius: 12px;
+      background: transparent;
+      box-shadow: none;
+      display: grid;
+      place-items: center;
+      overflow: visible;
+    }
+
+    .login-title {
+      font-weight: 800;
+      letter-spacing: -0.3px;
+      color: #e8eeff;
+    }
+
+    .login-sub {
+      color: #9fb4ff;
+    }
+
+    .login-card .form-control {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      color: #e8eeff;
+      border-radius: 26px;
+    }
+
+    .login-card .form-control:focus {
+      border-color: #60a5fa;
+      box-shadow: 0 0 0 0.2rem rgba(96, 165, 250, 0.25);
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .btn-neon {
+      background: linear-gradient(120deg, #ffffff, #a78bfa);
+      border: none;
+      color: #0c1120;
+      font-weight: 800;
+      letter-spacing: 0.3px;
+      box-shadow: 0 14px 40px rgba(96, 165, 250, 0.35);
+      position: relative;
+      overflow: hidden;
+      border-radius: 26px;
+    }
+
+    .btn-neon::after {
+      content: "";
+      position: absolute;
+      top: -60%;
+      left: -20%;
+      width: 60%;
+      height: 220%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+      transform: rotate(18deg);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .btn-neon:hover::after {
+      opacity: 1;
+    }
+
+    /* Layout */
+    #app-screen {
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      min-height: 100vh;
+      background: rgba(255, 255, 255, 0.03);
+      border-right: 1px solid var(--border);
+      padding: 24px 18px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+      font-weight: 700;
+      font-size: 18px;
+    }
+
+    .brand .badge-logo {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #3b82f6, #67c6ff);
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-weight: 800;
+      box-shadow: 0 10px 18px rgba(59, 130, 246, 0.25);
+    }
+
+    .side-nav {
+      display: grid;
+      gap: 6px;
+    }
+
+    .side-link {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      color: var(--text);
+      font-weight: 600;
+      border: 1px solid transparent;
+    }
+
+    .side-link:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .side-link.active {
+      background: rgba(124, 58, 237, 0.15);
+      border-color: rgba(124, 58, 237, 0.35);
+      color: #ffffff;
+    }
+
+    .side-footer {
+      margin-top: auto;
+      display: grid;
+      gap: 8px;
+    }
+
+    .pill-online {
+      background: #d9fce5;
+      color: #1b9a4c;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 12px;
+      text-align: center;
+    }
+
+    .card-panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 18px 20px;
+    }
+
+    .status-badge {
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 12px;
+      color: #fff;
+    }
+
+    .status-connected {
+      background: var(--success);
+    }
+
+    .status-waiting {
+      background: var(--warning);
+    }
+
+    .status-disconnected {
+      background: var(--danger);
+    }
+
+    .table thead th {
+      color: #6b7287;
+      font-weight: 700;
+      font-size: 13px;
+    }
+
+    .table td {
+      vertical-align: middle;
+      font-weight: 600;
+      color: #dbe6ff;
+    }
+
+    .avatar {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid #d7e5ff;
+    }
+
+    .btn-ghost {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #e8eeff;
+    }
+
+    .log-box {
+      background: #0b1220;
+      color: #cbd5f5;
+      border-radius: 10px;
+      padding: 12px;
+      font-family: "JetBrains Mono", monospace;
+      min-height: 180px;
+      max-height: 300px;
+      overflow-y: auto;
+      font-size: 12px;
+    }
+
+    .qr-preview {
+      width: 140px;
+      height: 140px;
+      border: 1px solid #e2e8f5;
+      border-radius: 12px;
+      display: none;
+    }
+
+    @keyframes shimmer {
+      0% {
+        background-position: 200% 0;
+      }
+
+      100% {
+        background-position: -200% 0;
+      }
+    }
+
+    @media (max-width: 992px) {
+      .sidebar {
+        min-height: auto;
+      }
+
+      #app-screen .row.g-0 {
+        flex-direction: column;
+      }
+    }
+
+    /* Loader overlay */
+    .app-loader {
+      position: fixed;
+      inset: 0;
+      background: rgba(12, 17, 32, 0.65);
+      backdrop-filter: blur(6px);
+      display: grid;
+      place-items: center;
+      z-index: 1050;
+    }
+
+    .app-loader.hidden {
+      display: none;
+    }
+
+    .spinner-dot {
+      width: 68px;
+      height: 68px;
+      border-radius: 50%;
+      border: 6px solid rgba(255, 255, 255, 0.18);
+      border-top-color: #60a5fa;
+      animation: spin 1s linear infinite;
+      box-shadow: 0 0 24px rgba(96, 165, 250, 0.5);
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="app-loader" class="app-loader hidden">
+    <div class="spinner-dot"></div>
+  </div>
+  <!-- LOGIN -->
+  <div id="login-screen">
+    <div class="login-card">
+      <div class="text-center mb-4 position-relative d-flex flex-column align-items-center" style="z-index:1;">
+        <div class="login-logo mb-3 d-flex justify-content-center align-items-center">
+          <img src="/logo-login.png" alt="WaConnect">
+        </div>
+        <h4 class="login-title mb-1">Entrar no manager</h4>
+        <p class="login-sub mb-0">Use suas credenciais para acessar.</p>
+      </div>
+      <form id="login-form" novalidate>
+        <div class="mb-3">
+          <label class="form-label" for="user">Usuário</label>
+          <input id="user" class="form-control" placeholder="" autocomplete="username" required />
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="pass">Senha</label>
+          <input id="pass" type="password" class="form-control" placeholder="" autocomplete="current-password"
+            required />
+        </div>
+        <button class="btn btn-neon w-100" type="submit">Entrar</button>
+      </form>
+      <div class="alert alert-light border mt-3 mb-0 hidden" id="login-log" role="alert" style="min-height:38px;"></div>
+    </div>
+  </div>
+
+  <!-- APP -->
+  <div id="app-screen" class="hidden">
+    <div class="row g-0">
+      <aside class="col-lg-2 col-md-3 sidebar d-flex flex-column">
+        <div class="brand">
+          <img src="/logo-login.png" alt="WaConnect">
+        </div>
+        <nav class="side-nav">
+          <a class="side-link active" href="#" id="nav-dashboard"><i class="bi bi-speedometer2"></i> Dashboard</a>
+          <!-- Menus extras escondidos a pedido do usuário
+          <a class="side-link" href="#"><i class="bi bi-plus-circle"></i> Criar Instância</a>
+          <a class="side-link" href="#"><i class="bi bi-columns"></i> Listar Instâncias</a>
+          <a class="side-link" href="#"><i class="bi bi-send"></i> Disparador</a>
+          <a class="side-link" href="#"><i class="bi bi-telephone-check"></i> Verificar Números</a>
+          <a class="side-link" href="#"><i class="bi bi-plug"></i> Integrações</a>
+          <a class="side-link" href="#"><i class="bi bi-hdd"></i> Armazenamento</a>
+          <a class="side-link" href="#"><i class="bi bi-gear"></i> Configurações</a>
+          -->
+          <a class="side-link" href="#" id="logout-btn"><i class="bi bi-box-arrow-left"></i> Desconectar</a>
+        </nav>
+        <div class="side-footer mt-4">
+          <div class="card border-0" style="background:#f2f4f9;">
+            <div class="card-body p-2">
+              <small class="text-muted d-block">Versão 1.0 (Beta)</small>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <main class="col-lg-10 col-md-9 p-4">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <div>
+            <h5 class="text-muted mb-1">MANAGER</h5>
+            <h3 class="fw-bold">Gerenciamento de Instância</h3>
+          </div>
+          <div class="d-flex align-items-center gap-3">
+            <button class="btn btn-ghost" id="api-docs-btn"><i class="bi bi-journal-code me-1"></i> API Docs</button>
+            <div class="d-flex align-items-center gap-2">
+              <span class="status-badge status-connected">ONLINE</span>
+              <img class="avatar" src="https://i.pravatar.cc/120?img=15" alt="avatar">
+            </div>
+          </div>
+        </div>
+
+        <div class="card-panel mb-4">
+          <div class="d-flex flex-wrap align-items-center gap-2">
+            <div class="status-badge status-waiting" id="status-pill">AGUARDANDO QR</div>
+            <div class="badge bg-light text-dark" id="connected-name">Não conectado</div>
+            <button class="btn btn-primary btn-sm" id="refresh"><i class="bi bi-qr-code me-1"></i> Gerar QR
+              Code</button>
+            <button class="btn btn-outline-secondary btn-sm" id="disconnect"><i class="bi bi-plug me-1"></i>
+              Desconectar</button>
+            <button class="btn btn-outline-secondary btn-sm" id="clear-cache"><i class="bi bi-eraser me-1"></i> Limpar
+              cache</button>
+          </div>
+        </div>
+
+        <div class="card-panel mb-4">
+          <div class="row g-3">
+            <div class="col-md-5 d-flex flex-column align-items-center">
+              <div class="w-100 d-flex justify-content-center align-items-center"
+                style="min-height:220px; border:1px dashed var(--border); border-radius:12px;">
+                <img id="qr-preview" class="qr-preview" alt="QR Code" />
+                <div id="qr-skeleton"
+                  style="width:120px;height:120px;border-radius:12px;background:linear-gradient(90deg,#eef1f8 0%,#f7f8fb 50%,#eef1f8 100%);background-size:200% 100%;animation: shimmer 1.3s ease-in-out infinite;">
+                </div>
+              </div>
+              <div class="mt-3 d-flex gap-2">
+                <button class="btn btn-primary" id="open-qr" disabled><i class="bi bi-arrows-fullscreen me-1"></i> Abrir
+                  QR</button>
+                <button class="btn btn-outline-secondary" id="refresh-small"><i class="bi bi-arrow-repeat"></i></button>
+              </div>
+            </div>
+            <div class="col-md-7">
+              <h6 class="fw-bold mb-2">Logs em tempo real</h6>
+              <div class="log-box" id="log-box"></div>
+            </div>
+          </div>
+        </div>
+
+        <footer class="py-3 mt-4 border-top" style="background:#fff;">
+          <div class="container">
+            <div class="d-flex flex-column flex-md-row justify-content-md-end align-items-center gap-3 text-end">
+              <span class="text-muted d-none d-md-inline">•</span>
+              <a class="text-decoration-none" href="https://github.com" target="_blank" rel="noopener">GitHub</a>
+              <span class="text-muted d-none d-md-inline">•</span>
+              <a class="text-decoration-none" href="https://www.buymeacoffee.com/" target="_blank"
+                rel="noopener">Doação</a>
+            </div>
+          </div>
+        </footer>
+      </main>
+    </div>
+  </div>
+
+  <!-- MODAL QR -->
+  <div class="modal fade" id="qrModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Escaneie o QR Code</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body d-flex justify-content-center">
+          <img id="qr" alt="QR Code" class="img-fluid" style="max-width:360px;" />
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Fechar</button>
+          <button type="button" class="btn btn-primary" id="refresh-modal">Gerar novo QR</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+    crossorigin="anonymous"></script>
+  <script>
+    // Elementos
+    const loginScreen = document.getElementById('login-screen');
+    const appScreen = document.getElementById('app-screen');
+    const loginForm = document.getElementById('login-form');
+    const loginLog = document.getElementById('login-log');
+    const userInput = document.getElementById('user');
+    const passInput = document.getElementById('pass');
+
+    const statusPill = document.getElementById('status-pill');
+    const connectedName = document.getElementById('connected-name');
+    const refreshBtn = document.getElementById('refresh');
+    const refreshSmallBtn = document.getElementById('refresh-small');
+    const refreshModalBtn = document.getElementById('refresh-modal');
+    const disconnectBtn = document.getElementById('disconnect');
+    const clearCacheBtn = document.getElementById('clear-cache');
+    const logoutBtn = document.getElementById('logout-btn');
+    const apiDocsBtn = document.getElementById('api-docs-btn');
+
+    const qrModal = new bootstrap.Modal(document.getElementById('qrModal'));
+    const qrImg = document.getElementById('qr');
+    const qrPreview = document.getElementById('qr-preview');
+    const qrSkeleton = document.getElementById('qr-skeleton');
+    const openQrBtn = document.getElementById('open-qr');
+    const logBox = document.getElementById('log-box');
+    const instancesTable = document.getElementById('instances-table');
+    const loader = document.getElementById('app-loader');
+
+    const COOKIE_NAME = 'api_token';
+    let apiToken = localStorage.getItem('api_token') || readCookie(COOKIE_NAME) || '';
+    let pollInterval = null;
+    let lastConnected = null;
+    let lastQr = null;
+
+    function renderInstances() {
+      instancesTable.innerHTML = dummyInstances.map((item) => `
+        <tr>
+          <td>#</td>
+          <td class="fw-bold text-uppercase">${item.name}</td>
+          <td>${item.number}</td>
+          <td>${renderStatus(item.status)}</td>
+          <td class="text-end"><button class="btn btn-ghost btn-sm" onclick="openQrFromTable()"><i class="bi bi-qr-code"></i> Gerar QR</button></td>
+        </tr>
+      `).join('');
+    }
+
+    function renderStatus(text) {
+      let cls = 'status-connected';
+      if (text.includes('AGUARDANDO')) cls = 'status-waiting';
+      if (text.includes('DESCONECTADA')) cls = 'status-disconnected';
+      return `<span class="status-badge ${cls}">${text}</span>`;
+    }
+
+    window.openQrFromTable = function () {
+      if (lastQr) qrModal.show();
+      else addLog('Nenhum QR disponível ainda.');
+    }
+
+    apiDocsBtn?.addEventListener('click', (ev) => { ev.preventDefault(); window.open('/api-docs', '_blank'); });
+
+    refreshBtn.addEventListener('click', () => { addLog('Solicitando novo QR'); loadQR(true); });
+    refreshSmallBtn.addEventListener('click', () => { addLog('Solicitando novo QR'); loadQR(true); });
+    refreshModalBtn.addEventListener('click', () => { addLog('Solicitando novo QR'); loadQR(true); });
+    openQrBtn.addEventListener('click', () => { if (lastQr) qrModal.show(); });
+
+    disconnectBtn.addEventListener('click', async () => {
+      const res = await fetch('/api/disconnect', { method: 'POST', headers: withToken() });
+      if (res.status === 401) { clearToken(); showLogin(); return; }
+      addLog('Instância desconectada.');
+      loadQR(true);
+    });
+
+    clearCacheBtn.addEventListener('click', async () => {
+      const res = await fetch('/api/clear-cache', { method: 'POST', headers: withToken() });
+      if (res.status === 401) { clearToken(); showLogin(); return; }
+      addLog('Cache limpo.');
+      loadQR(true);
+    });
+
+    logoutBtn.addEventListener('click', () => { clearToken(); stopPolling(); showLogin(); });
+
+    loginForm.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      clearToken(); // evita token inválido persistido
+      const user = userInput.value.trim();
+      const pass = passInput.value.trim();
+      try {
+        const res = await fetch('/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user, pass }) });
+        const data = await res.json();
+        if (res.ok && data.token) {
+          setSessionToken(data.token);
+          loginLog.classList.add('hidden');
+          loginLog.textContent = '';
+          showApp();
+          startPolling();
+          loadQR(true);
+        } else {
+          loginLog.textContent = data.error || `Login falhou (status ${res.status}).`;
+          loginLog.classList.remove('hidden');
+        }
+      } catch (err) {
+        loginLog.textContent = 'Erro de rede no login.';
+        loginLog.classList.remove('hidden');
+      }
+    });
+
+    async function ensureAuthAndStart() {
+      // tenta cookie se localStorage estiver vazio
+      if (!apiToken) {
+        const cookieToken = readCookie(COOKIE_NAME);
+        if (cookieToken) {
+          apiToken = cookieToken;
+          localStorage.setItem('api_token', apiToken);
+        }
+      }
+      if (!apiToken) { showLogin(); return; }
+      try {
+        const res = await fetch('/api/status', { headers: withToken() });
+        if (res.status === 401) { clearToken(); showLogin(); return; }
+        showApp();
+        startPolling();
+        loadQR(true);
+      } catch { showLogin(); }
+    }
+
+    function showLogin() {
+      stopPolling();
+      document.body.classList.add('login-mode');
+      loginScreen.classList.remove('hidden');
+      appScreen.classList.add('hidden');
+      hideLoader();
+    }
+    function showApp() {
+      document.body.classList.remove('login-mode');
+      loginScreen.classList.add('hidden');
+      appScreen.classList.remove('hidden');
+      renderInstances();
+      showLoader();
+    }
+
+    function setSessionToken(token) {
+      apiToken = token;
+      localStorage.setItem('api_token', token);
+      document.cookie = `${COOKIE_NAME}=${token}; max-age=${60 * 60 * 24 * 30}; path=/;`;
+    }
+
+    function clearToken() {
+      apiToken = '';
+      localStorage.removeItem('api_token');
+      document.cookie = `${COOKIE_NAME}=; Max-Age=0; path=/;`;
+    }
+    function withToken() { return apiToken ? { 'x-api-token': apiToken } : {}; }
+    function readCookie(name) {
+      const cookies = document.cookie.split(';').map((c) => c.trim());
+      const found = cookies.find((c) => c.startsWith(name + '='));
+      return found ? decodeURIComponent(found.split('=')[1]) : null;
+    }
+
+    function addLog(msg) {
+      const line = `[${new Date().toLocaleTimeString('pt-BR')}] ${msg}`;
+      logBox.textContent = (logBox.textContent + '\n' + line).trim();
+      logBox.scrollTop = logBox.scrollHeight;
+    }
+
+    function showSkeleton(show) { qrSkeleton?.classList.toggle('hidden', !show); }
+    function togglePreview(show) {
+      if (show) { qrPreview.style.display = 'block'; openQrBtn.removeAttribute('disabled'); }
+      else { qrPreview.style.display = 'none'; openQrBtn.setAttribute('disabled', 'disabled'); }
+    }
+
+    function startPolling() {
+      if (pollInterval) return;
+      if (!apiToken) return;
+      pollInterval = setInterval(() => loadQR(false), 3500);
+    }
+
+    function stopPolling() {
+      if (!pollInterval) return;
+      clearInterval(pollInterval);
+      pollInterval = null;
+    }
+
+    function showLoader() { loader?.classList.remove('hidden'); }
+    function hideLoader() { loader?.classList.add('hidden'); }
+
+    async function loadQR(forceLog = false) {
+      if (!apiToken) { showSkeleton(false); togglePreview(false); hideLoader(); return; }
+      showSkeleton(true);
+      try {
+        const res = await fetch('/api/qr', { headers: withToken() });
+        if (res.status === 401) { clearToken(); stopPolling(); showLogin(); return; }
+        const data = await res.json();
+
+        const connected = !!data.connected;
+        if (forceLog || lastConnected !== connected) { addLog(connected ? 'Conectado.' : 'Desconectado / aguardando QR.'); }
+        lastConnected = connected;
+
+        if (connected) {
+          const name = (data.pushName ? data.pushName : 'Sem nome') + (data.me ? ' - ' + data.me : '');
+          statusPill.textContent = 'INSTANCIA CONECTADA';
+          statusPill.className = 'status-badge status-connected';
+          connectedName.textContent = name || '-';
+          togglePreview(false);
+          showSkeleton(false);
+        } else if (data.qrDataUrl) {
+          statusPill.textContent = 'AGUARDANDO CONECTAR';
+          statusPill.className = 'status-badge status-waiting';
+          qrImg.src = data.qrDataUrl;
+          qrPreview.src = data.qrDataUrl;
+          lastQr = data.qrDataUrl;
+          togglePreview(true);
+          showSkeleton(false);
+          connectedName.textContent = '-';
+        } else {
+          statusPill.textContent = 'INSTANCIA DESCONECTADA';
+          statusPill.className = 'status-badge status-disconnected';
+          togglePreview(false);
+          showSkeleton(true);
+          connectedName.textContent = '-';
+        }
+        hideLoader();
+      } catch (err) {
+        statusPill.textContent = 'ERRO';
+        statusPill.className = 'status-badge status-disconnected';
+        addLog('Erro ao carregar QR.');
+        console.error(err);
+        hideLoader();
+      }
+    }
+
+    ensureAuthAndStart();
+    setInterval(() => loadQR(false), 3500);
+  </script>
+</body>
+
+</html>
