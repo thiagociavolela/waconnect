@@ -57,7 +57,11 @@ export class WhatsAppService {
 
   private loadBaileys() {
     if (!this.baileysModule) {
-      this.baileysModule = import("@whiskeysockets/baileys");
+      // usa import nativo para evitar require() em ESM
+      const dynamicImport = new Function("specifier", "return import(specifier);") as (
+        s: string
+      ) => Promise<typeof import("@whiskeysockets/baileys")>;
+      this.baileysModule = dynamicImport("@whiskeysockets/baileys");
     }
     return this.baileysModule;
   }
