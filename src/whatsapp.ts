@@ -10,7 +10,6 @@ import { Boom } from "@hapi/boom";
 import path from "path";
 import fs from "fs/promises";
 import { getAudioUrl } from "google-tts-api";
-import fetch from "node-fetch";
 
 export type MediaKind = "image" | "video" | "audio" | "document";
 

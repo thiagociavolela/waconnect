@@ -40,7 +40,6 @@ exports.WhatsAppService = void 0;
 const path_1 = __importDefault(require("path"));
 const promises_1 = __importDefault(require("fs/promises"));
 const google_tts_api_1 = require("google-tts-api");
-const node_fetch_1 = __importDefault(require("node-fetch"));
 class WhatsAppService {
     constructor() {
         this.socket = null;
@@ -222,7 +221,7 @@ class WhatsAppService {
     async sendNarration({ to, text, lang = "pt-BR", slow = false }) {
         return this.withRetry(async () => {
             const url = (0, google_tts_api_1.getAudioUrl)(text, { lang, slow, host: "https://translate.google.com" });
-            const audioRes = await (0, node_fetch_1.default)(url, {
+            const audioRes = await fetch(url, {
                 headers: {
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121 Safari/537.36"
                 }
