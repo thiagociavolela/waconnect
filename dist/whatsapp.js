@@ -37,7 +37,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.WhatsAppService = void 0;
-const baileys_1 = __importStar(require("@whiskeysockets/baileys"));
 const path_1 = __importDefault(require("path"));
 const promises_1 = __importDefault(require("fs/promises"));
 const google_tts_api_1 = require("google-tts-api");
@@ -49,7 +48,14 @@ class WhatsAppService {
         this.connecting = false;
         this.connected = false;
         this.authFolder = path_1.default.join(process.cwd(), "auth");
+        this.baileysModule = null;
         void this.start();
+    }
+    loadBaileys() {
+        if (!this.baileysModule) {
+            this.baileysModule = Promise.resolve().then(() => __importStar(require("@whiskeysockets/baileys")));
+        }
+        return this.baileysModule;
     }
     get status() {
         return {
@@ -63,13 +69,14 @@ class WhatsAppService {
         if (this.connecting)
             return;
         this.connecting = true;
-        const { state, saveCreds } = await (0, baileys_1.useMultiFileAuthState)(this.authFolder);
-        const { version } = await (0, baileys_1.fetchLatestBaileysVersion)();
-        this.socket = (0, baileys_1.default)({
+        const baileys = await this.loadBaileys();
+        const { state, saveCreds } = await baileys.useMultiFileAuthState(this.authFolder);
+        const { version } = await baileys.fetchLatestBaileysVersion();
+        this.socket = baileys.makeWASocket({
             version,
             auth: state,
             printQRInTerminal: false,
-            browser: baileys_1.Browsers.macOS("Chrome")
+            browser: baileys.Browsers.macOS("Chrome")
         });
         this.socket.ev.on("creds.update", saveCreds);
         this.socket.ev.on("connection.update", (update) => {
@@ -89,7 +96,7 @@ class WhatsAppService {
             if (connection === "close") {
                 this.connected = false;
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
-                const shouldReconnect = statusCode !== baileys_1.DisconnectReason.loggedOut;
+                const shouldReconnect = statusCode !== baileys.DisconnectReason.loggedOut;
                 if (shouldReconnect) {
                     this.connecting = false;
                     void this.start();

@@ -1,7 +1,6 @@
-import makeWASocket, {
+import type {
   AnyMessageContent,
   Browsers,
-  DisconnectReason,
   WAMessageKey,
   WASocket,
   fetchLatestBaileysVersion,
@@ -55,6 +54,15 @@ export class WhatsAppService {
     void this.start();
   }
 
+  private baileysModule: Promise<typeof import("@whiskeysockets/baileys")> | null = null;
+
+  private loadBaileys() {
+    if (!this.baileysModule) {
+      this.baileysModule = import("@whiskeysockets/baileys");
+    }
+    return this.baileysModule;
+  }
+
   get status() {
     return {
       connected: this.connected,
@@ -68,14 +76,15 @@ export class WhatsAppService {
     if (this.connecting) return;
     this.connecting = true;
 
-    const { state, saveCreds } = await useMultiFileAuthState(this.authFolder);
-    const { version } = await fetchLatestBaileysVersion();
+    const baileys = await this.loadBaileys();
+    const { state, saveCreds } = await baileys.useMultiFileAuthState(this.authFolder);
+    const { version } = await baileys.fetchLatestBaileysVersion();
 
-    this.socket = makeWASocket({
+    this.socket = baileys.makeWASocket({
       version,
       auth: state,
       printQRInTerminal: false,
-      browser: Browsers.macOS("Chrome")
+      browser: baileys.Browsers.macOS("Chrome")
     });
 
     this.socket.ev.on("creds.update", saveCreds);
@@ -99,7 +108,7 @@ export class WhatsAppService {
       if (connection === "close") {
         this.connected = false;
         const statusCode = (lastDisconnect?.error as Boom | undefined)?.output?.statusCode;
-        const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+        const shouldReconnect = statusCode !== baileys.DisconnectReason.loggedOut;
         if (shouldReconnect) {
           this.connecting = false;
           void this.start();

@@ -1,4 +1,4 @@
-import { WAMessageKey } from "@whiskeysockets/baileys";
+import type { WAMessageKey } from "@whiskeysockets/baileys";
 export type MediaKind = "image" | "video" | "audio" | "document";
 export interface SendTextPayload {
     to: string;
@@ -32,6 +32,8 @@ export declare class WhatsAppService {
     private meJid;
     private pushName;
     constructor();
+    private baileysModule;
+    private loadBaileys;
     get status(): {
         connected: boolean;
         me: string | undefined;
