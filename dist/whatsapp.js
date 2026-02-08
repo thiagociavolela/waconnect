@@ -4,6 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.WhatsAppService = void 0;
+const p_queue_1 = __importDefault(require("p-queue"));
 const path_1 = __importDefault(require("path"));
 const promises_1 = __importDefault(require("fs/promises"));
 const google_tts_api_1 = require("google-tts-api");
@@ -14,6 +15,8 @@ class WhatsAppService {
         this.connecting = false;
         this.connected = false;
         this.authFolder = path_1.default.join(process.cwd(), "auth");
+        this.queue = new p_queue_1.default({ concurrency: 3 });
+        this.lastSendByJid = new Map();
         this.baileysModule = null;
         void this.start();
     }
@@ -128,6 +131,41 @@ class WhatsAppService {
             throw new Error("WhatsApp socket not initialized");
         return this.socket;
     }
+    async scheduleSend(jid, fn) {
+        return this.queue.add(async () => {
+            const now = Date.now();
+            const last = this.lastSendByJid.get(jid) ?? 0;
+            const baseGap = 1500; // 1.5s entre mensagens para o mesmo destino
+            const jitter = Math.floor(Math.random() * 700); // +0-700ms para evitar padrão robótico
+            const waitMs = Math.max(0, last + baseGap + jitter - now);
+            if (waitMs > 0) {
+                await new Promise((resolve) => setTimeout(resolve, waitMs));
+            }
+            const result = await fn();
+            this.lastSendByJid.set(jid, Date.now());
+            return result;
+        }, { throwOnTimeout: true });
+    }
+    /**
+     * Ajusta números brasileiros que podem estar sem o 9º dígito nos celulares.
+     * Se vier com DDI 55 + DDD + 8 dígitos iniciando em 6–9, insere o 9.
+     */
+    normalizeBrazilNumber(raw) {
+        let digits = raw.replace(/\D/g, "");
+        let addedNine = false;
+        if (digits.startsWith("55")) {
+            const rest = digits.slice(2); // DDD + número
+            if (rest.length === 10) {
+                const ddd = rest.slice(0, 2);
+                const local = rest.slice(2);
+                if (/^[6-9]/.test(local)) {
+                    digits = `55${ddd}9${local}`;
+                    addedNine = true;
+                }
+            }
+        }
+        return { formatted: digits, addedNine };
+    }
     formatJid(raw) {
         const normalized = raw.replace(/\s|-/g, "");
         if (normalized.endsWith("@s.whatsapp.net") || normalized.endsWith("@g.us")) {
@@ -135,13 +173,14 @@ class WhatsAppService {
         }
         if (normalized.includes("@"))
             return normalized;
-        return `${normalized}@s.whatsapp.net`;
+        const { formatted } = this.normalizeBrazilNumber(normalized);
+        return `${formatted}@s.whatsapp.net`;
     }
     async sendText({ to, message }) {
-        return this.withRetry(async () => {
+        const jid = this.formatJid(to);
+        return this.scheduleSend(jid, () => this.withRetry(async () => {
             const baileys = await this.loadBaileys();
             const sock = this.assertSocket();
-            const jid = this.formatJid(to);
             let linkPreview;
             const hasUrl = /(https?:\/\/[^\s]+)/i.test(message);
             if (hasUrl) {
@@ -163,12 +202,12 @@ class WhatsAppService {
             const content = linkPreview ? { text: message, linkPreview } : { text: message };
             const result = await sock.sendMessage(jid, content);
             return result?.key;
-        });
+        }));
     }
     async sendMedia({ to, buffer, kind, mimetype, fileName, caption }) {
-        return this.withRetry(async () => {
+        const jid = this.formatJid(to);
+        return this.scheduleSend(jid, () => this.withRetry(async () => {
             const sock = this.assertSocket();
-            const jid = this.formatJid(to);
             let content;
             switch (kind) {
                 case "image":
@@ -191,12 +230,12 @@ class WhatsAppService {
             }
             const result = await sock.sendMessage(jid, content);
             return result?.key;
-        });
+        }));
     }
     async sendContact({ to, name, phone }) {
-        return this.withRetry(async () => {
+        const jid = this.formatJid(to);
+        return this.scheduleSend(jid, () => this.withRetry(async () => {
             const sock = this.assertSocket();
-            const jid = this.formatJid(to);
             const vcard = [
                 "BEGIN:VCARD",
                 "VERSION:3.0",
@@ -212,7 +251,7 @@ class WhatsAppService {
             };
             const result = await sock.sendMessage(jid, content);
             return result?.key;
-        });
+        }));
     }
     async sendNarration({ to, text, lang = "pt-BR", slow = false }) {
         return this.withRetry(async () => {

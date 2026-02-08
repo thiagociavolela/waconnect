@@ -1,6 +1,7 @@
 import type { AnyMessageContent, Browsers, WAMessageKey, WASocket, WAUrlInfo } from "@whiskeysockets/baileys";
 import { fetchLatestBaileysVersion, useMultiFileAuthState } from "@whiskeysockets/baileys";
 import { Boom } from "@hapi/boom";
+import PQueue from "p-queue";
 import path from "path";
 import fs from "fs/promises";
 import { getAudioUrl } from "google-tts-api";
@@ -42,6 +43,8 @@ export class WhatsAppService {
   private authFolder = path.join(process.cwd(), "auth");
   private meJid: string | undefined;
   private pushName: string | undefined;
+  private queue = new PQueue({ concurrency: 3 });
+  private lastSendByJid = new Map<string, number>();
 
   constructor() {
     void this.start();
@@ -172,98 +175,147 @@ export class WhatsAppService {
     return this.socket;
   }
 
+  private async scheduleSend<T>(jid: string, fn: () => Promise<T>): Promise<T> {
+    return this.queue.add<T>(
+      async () => {
+        const now = Date.now();
+        const last = this.lastSendByJid.get(jid) ?? 0;
+        const baseGap = 1500; // 1.5s entre mensagens para o mesmo destino
+        const jitter = Math.floor(Math.random() * 700); // +0-700ms para evitar padrão robótico
+        const waitMs = Math.max(0, last + baseGap + jitter - now);
+        if (waitMs > 0) {
+          await new Promise((resolve) => setTimeout(resolve, waitMs));
+        }
+        const result = await fn();
+        this.lastSendByJid.set(jid, Date.now());
+        return result;
+      },
+      { throwOnTimeout: true }
+    );
+  }
+
+  /**
+   * Ajusta números brasileiros que podem estar sem o 9º dígito nos celulares.
+   * Se vier com DDI 55 + DDD + 8 dígitos iniciando em 6–9, insere o 9.
+   */
+  private normalizeBrazilNumber(raw: string): { formatted: string; addedNine: boolean } {
+    let digits = raw.replace(/\D/g, "");
+    let addedNine = false;
+
+    if (digits.startsWith("55")) {
+      const rest = digits.slice(2); // DDD + número
+      if (rest.length === 10) {
+        const ddd = rest.slice(0, 2);
+        const local = rest.slice(2);
+        if (/^[6-9]/.test(local)) {
+          digits = `55${ddd}9${local}`;
+          addedNine = true;
+        }
+      }
+    }
+
+    return { formatted: digits, addedNine };
+  }
+
   private formatJid(raw: string): string {
     const normalized = raw.replace(/\s|-/g, "");
     if (normalized.endsWith("@s.whatsapp.net") || normalized.endsWith("@g.us")) {
       return normalized;
     }
     if (normalized.includes("@")) return normalized;
-    return `${normalized}@s.whatsapp.net`;
+    const { formatted } = this.normalizeBrazilNumber(normalized);
+    return `${formatted}@s.whatsapp.net`;
   }
 
   async sendText({ to, message }: SendTextPayload) {
-    return this.withRetry(async () => {
-      const baileys = await this.loadBaileys();
-      const sock = this.assertSocket();
-      const jid = this.formatJid(to);
-      let linkPreview: WAUrlInfo | undefined;
-      const hasUrl = /(https?:\/\/[^\s]+)/i.test(message);
-      if (hasUrl) {
-        try {
-          linkPreview = await baileys.getUrlInfo(message, {
-            thumbnailWidth: 192,
-            fetchOpts: {
-              timeout: 8000,
-              headers: {
-                "User-Agent":
-                  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121 Safari/537.36"
+    const jid = this.formatJid(to);
+    return this.scheduleSend(jid, () =>
+      this.withRetry(async () => {
+        const baileys = await this.loadBaileys();
+        const sock = this.assertSocket();
+        let linkPreview: WAUrlInfo | undefined;
+        const hasUrl = /(https?:\/\/[^\s]+)/i.test(message);
+        if (hasUrl) {
+          try {
+            linkPreview = await baileys.getUrlInfo(message, {
+              thumbnailWidth: 192,
+              fetchOpts: {
+                timeout: 8000,
+                headers: {
+                  "User-Agent":
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121 Safari/537.36"
+                }
               }
-            }
-          });
-        } catch (err) {
-          console.warn("Falha ao gerar link preview", err);
+            });
+          } catch (err) {
+            console.warn("Falha ao gerar link preview", err);
+          }
         }
-      }
-      const content: AnyMessageContent = linkPreview ? { text: message, linkPreview } : { text: message };
-      const result = await sock.sendMessage(jid, content);
-      return result?.key as WAMessageKey;
-    });
+        const content: AnyMessageContent = linkPreview ? { text: message, linkPreview } : { text: message };
+        const result = await sock.sendMessage(jid, content);
+        return result?.key as WAMessageKey;
+      })
+    );
   }
 
   async sendMedia({ to, buffer, kind, mimetype, fileName, caption }: SendMediaPayload) {
-    return this.withRetry(async () => {
-      const sock = this.assertSocket();
-      const jid = this.formatJid(to);
+    const jid = this.formatJid(to);
+    return this.scheduleSend(jid, () =>
+      this.withRetry(async () => {
+        const sock = this.assertSocket();
 
-      let content: AnyMessageContent;
-      switch (kind) {
-        case "image":
-          content = { image: buffer, ...(caption ? { caption } : {}) };
-          break;
-        case "video":
-          content = { video: buffer, ...(caption ? { caption } : {}) };
-          break;
-        case "audio":
-          content = { audio: buffer, mimetype: mimetype ?? "audio/ogg; codecs=opus" };
-          break;
-        case "document":
-        default:
-          content = {
-            document: buffer,
-            mimetype: mimetype ?? "application/octet-stream",
-            fileName: fileName ?? "document"
-          };
-          break;
-      }
+        let content: AnyMessageContent;
+        switch (kind) {
+          case "image":
+            content = { image: buffer, ...(caption ? { caption } : {}) };
+            break;
+          case "video":
+            content = { video: buffer, ...(caption ? { caption } : {}) };
+            break;
+          case "audio":
+            content = { audio: buffer, mimetype: mimetype ?? "audio/ogg; codecs=opus" };
+            break;
+          case "document":
+          default:
+            content = {
+              document: buffer,
+              mimetype: mimetype ?? "application/octet-stream",
+              fileName: fileName ?? "document"
+            };
+            break;
+        }
 
-      const result = await sock.sendMessage(jid, content);
-      return result?.key as WAMessageKey;
-    });
+        const result = await sock.sendMessage(jid, content);
+        return result?.key as WAMessageKey;
+      })
+    );
   }
 
   async sendContact({ to, name, phone }: SendContactPayload) {
-    return this.withRetry(async () => {
-      const sock = this.assertSocket();
-      const jid = this.formatJid(to);
+    const jid = this.formatJid(to);
+    return this.scheduleSend(jid, () =>
+      this.withRetry(async () => {
+        const sock = this.assertSocket();
 
-      const vcard = [
-        "BEGIN:VCARD",
-        "VERSION:3.0",
-        `FN:${name}`,
-        `TEL;type=CELL;type=VOICE;waid=${phone.replace(/\D/g, "")}:${phone}`,
-        "END:VCARD"
-      ].join("\n");
+        const vcard = [
+          "BEGIN:VCARD",
+          "VERSION:3.0",
+          `FN:${name}`,
+          `TEL;type=CELL;type=VOICE;waid=${phone.replace(/\D/g, "")}:${phone}`,
+          "END:VCARD"
+        ].join("\n");
 
-      const content: AnyMessageContent = {
-        contacts: {
-          displayName: name,
-          contacts: [{ vcard }]
-        }
-      };
+        const content: AnyMessageContent = {
+          contacts: {
+            displayName: name,
+            contacts: [{ vcard }]
+          }
+        };
 
-      const result = await sock.sendMessage(jid, content);
-      return result?.key as WAMessageKey;
-    });
+        const result = await sock.sendMessage(jid, content);
+        return result?.key as WAMessageKey;
+      })
+    );
   }
 
   async sendNarration({ to, text, lang = "pt-BR", slow = false }: SendNarrationPayload) {

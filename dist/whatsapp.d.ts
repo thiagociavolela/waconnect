@@ -31,6 +31,8 @@ export declare class WhatsAppService {
     private authFolder;
     private meJid;
     private pushName;
+    private queue;
+    private lastSendByJid;
     constructor();
     private baileysModule;
     private loadBaileys;
@@ -46,6 +48,12 @@ export declare class WhatsAppService {
     clearCacheOnly(): Promise<void>;
     disconnect(): Promise<void>;
     private assertSocket;
+    private scheduleSend;
+    /**
+     * Ajusta números brasileiros que podem estar sem o 9º dígito nos celulares.
+     * Se vier com DDI 55 + DDD + 8 dígitos iniciando em 6–9, insere o 9.
+     */
+    private normalizeBrazilNumber;
     private formatJid;
     sendText({ to, message }: SendTextPayload): Promise<WAMessageKey>;
     sendMedia({ to, buffer, kind, mimetype, fileName, caption }: SendMediaPayload): Promise<WAMessageKey>;
