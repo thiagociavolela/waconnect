@@ -1,11 +1,5 @@
-import type {
-  AnyMessageContent,
-  Browsers,
-  WAMessageKey,
-  WASocket,
-  fetchLatestBaileysVersion,
-  useMultiFileAuthState
-} from "@whiskeysockets/baileys";
+import type { AnyMessageContent, Browsers, WAMessageKey, WASocket, WAUrlInfo } from "@whiskeysockets/baileys";
+import { fetchLatestBaileysVersion, useMultiFileAuthState } from "@whiskeysockets/baileys";
 import { Boom } from "@hapi/boom";
 import path from "path";
 import fs from "fs/promises";
@@ -87,7 +81,16 @@ export class WhatsAppService {
       version,
       auth: state,
       printQRInTerminal: false,
-      browser: baileys.Browsers.macOS("Chrome")
+      browser: baileys.Browsers.macOS("Chrome"),
+      // ativa thumbnails enviadas para gerar previews ricos de links
+      generateHighQualityLinkPreview: true,
+      // define user-agent para melhorar compatibilidade de scraping de OG tags
+      options: {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121 Safari/537.36"
+        }
+      }
     });
 
     this.socket.ev.on("creds.update", saveCreds);
@@ -180,9 +183,28 @@ export class WhatsAppService {
 
   async sendText({ to, message }: SendTextPayload) {
     return this.withRetry(async () => {
+      const baileys = await this.loadBaileys();
       const sock = this.assertSocket();
       const jid = this.formatJid(to);
-      const content: AnyMessageContent = { text: message };
+      let linkPreview: WAUrlInfo | undefined;
+      const hasUrl = /(https?:\/\/[^\s]+)/i.test(message);
+      if (hasUrl) {
+        try {
+          linkPreview = await baileys.getUrlInfo(message, {
+            thumbnailWidth: 192,
+            fetchOpts: {
+              timeout: 8000,
+              headers: {
+                "User-Agent":
+                  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121 Safari/537.36"
+              }
+            }
+          });
+        } catch (err) {
+          console.warn("Falha ao gerar link preview", err);
+        }
+      }
+      const content: AnyMessageContent = linkPreview ? { text: message, linkPreview } : { text: message };
       const result = await sock.sendMessage(jid, content);
       return result?.key as WAMessageKey;
     });

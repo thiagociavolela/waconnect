@@ -17,6 +17,8 @@
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
     "google-tts-api": "^2.0.2",
+    "jimp": "^1.6.0",
+    "link-preview-js": "^3.2.0",
     "multer": "^2.0.2",
     "node-fetch": "^3.3.2",
     "p-queue": "^8.0.1",
