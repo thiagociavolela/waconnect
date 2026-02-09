@@ -291,12 +291,13 @@ app.get("/api/qr", async (_req: Request, res: Response) => {
     qr,
     qrDataUrl,
     me: status.me,
-    pushName: status.pushName
+    pushName: status.pushName,
+    profilePicUrl: status.profilePicUrl
   });
 });
 
-app.get("/api/status", (_req: Request, res: Response) => {
-  res.json(whatsapp.status);
+app.get("/api/status", async (_req: Request, res: Response) => {
+  res.json(await whatsapp.statusWithFreshPic());
 });
 
 app.post("/api/qr/new", async (_req: Request, res: Response) => {

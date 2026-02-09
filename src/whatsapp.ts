@@ -43,6 +43,7 @@ export class WhatsAppService {
   private authFolder = path.join(process.cwd(), "auth");
   private meJid: string | undefined;
   private pushName: string | undefined;
+  private profilePicUrl: string | undefined;
   private queue = new PQueue({ concurrency: 3 });
   private lastSendByJid = new Map<string, number>();
 
@@ -51,6 +52,17 @@ export class WhatsAppService {
   }
 
   private baileysModule: Promise<typeof import("@whiskeysockets/baileys")> | null = null;
+
+  private async loadProfilePic() {
+    try {
+      const jid = this.socket?.user?.id;
+      if (!jid) return;
+      const url = await this.socket?.profilePictureUrl(jid, "image");
+      this.profilePicUrl = url ?? undefined;
+    } catch (err) {
+      console.warn("Não foi possível carregar foto de perfil", err);
+    }
+  }
 
   private loadBaileys() {
     if (!this.baileysModule) {
@@ -68,8 +80,14 @@ export class WhatsAppService {
       connected: this.connected,
       me: this.meJid,
       pushName: this.pushName,
-      qr: this.qrString
+      qr: this.qrString,
+      profilePicUrl: this.profilePicUrl
     };
+  }
+
+  async statusWithFreshPic() {
+    await this.loadProfilePic();
+    return this.status;
   }
 
   async start() {
@@ -112,6 +130,7 @@ export class WhatsAppService {
         this.qrString = null;
         this.meJid = this.socket?.user?.id;
         this.pushName = this.socket?.user?.name;
+        void this.loadProfilePic();
       }
 
       if (connection === "close") {
@@ -141,6 +160,7 @@ export class WhatsAppService {
     this.connected = false;
     this.socket = null;
     this.qrString = null;
+    this.profilePicUrl = undefined;
     void this.start();
   }
 
@@ -168,6 +188,7 @@ export class WhatsAppService {
     this.connected = false;
     this.socket = null;
     this.qrString = null;
+    this.profilePicUrl = undefined;
   }
 
   private assertSocket(): WASocket {

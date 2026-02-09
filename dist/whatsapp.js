@@ -20,6 +20,18 @@ class WhatsAppService {
         this.baileysModule = null;
         void this.start();
     }
+    async loadProfilePic() {
+        try {
+            const jid = this.socket?.user?.id;
+            if (!jid)
+                return;
+            const url = await this.socket?.profilePictureUrl(jid, "image");
+            this.profilePicUrl = url ?? undefined;
+        }
+        catch (err) {
+            console.warn("Não foi possível carregar foto de perfil", err);
+        }
+    }
     loadBaileys() {
         if (!this.baileysModule) {
             // usa import nativo para evitar require() em ESM
@@ -33,8 +45,13 @@ class WhatsAppService {
             connected: this.connected,
             me: this.meJid,
             pushName: this.pushName,
-            qr: this.qrString
+            qr: this.qrString,
+            profilePicUrl: this.profilePicUrl
         };
+    }
+    async statusWithFreshPic() {
+        await this.loadProfilePic();
+        return this.status;
     }
     async start() {
         if (this.connecting)
@@ -71,6 +88,7 @@ class WhatsAppService {
                 this.qrString = null;
                 this.meJid = this.socket?.user?.id;
                 this.pushName = this.socket?.user?.name;
+                void this.loadProfilePic();
             }
             if (connection === "close") {
                 this.connected = false;
@@ -99,6 +117,7 @@ class WhatsAppService {
         this.connected = false;
         this.socket = null;
         this.qrString = null;
+        this.profilePicUrl = undefined;
         void this.start();
     }
     async forceNewQr() {
@@ -125,6 +144,7 @@ class WhatsAppService {
         this.connected = false;
         this.socket = null;
         this.qrString = null;
+        this.profilePicUrl = undefined;
     }
     assertSocket() {
         if (!this.socket)

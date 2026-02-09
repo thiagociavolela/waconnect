@@ -31,17 +31,27 @@ export declare class WhatsAppService {
     private authFolder;
     private meJid;
     private pushName;
+    private profilePicUrl;
     private queue;
     private lastSendByJid;
     constructor();
     private baileysModule;
+    private loadProfilePic;
     private loadBaileys;
     get status(): {
         connected: boolean;
         me: string | undefined;
         pushName: string | undefined;
         qr: string | null;
+        profilePicUrl: string | undefined;
     };
+    statusWithFreshPic(): Promise<{
+        connected: boolean;
+        me: string | undefined;
+        pushName: string | undefined;
+        qr: string | null;
+        profilePicUrl: string | undefined;
+    }>;
     start(): Promise<void>;
     private resetAuthAndRestart;
     forceNewQr(): Promise<void>;
