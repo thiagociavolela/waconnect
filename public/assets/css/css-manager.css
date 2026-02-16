@@ -18,6 +18,10 @@
       box-sizing: border-box;
     }
 
+    html {
+      height: 100%;
+    }
+
     body {
       margin: 0;
       font-family: "Inter", system-ui, -apple-system, sans-serif;
@@ -26,6 +30,8 @@
       min-height: 100vh;
       position: relative;
       overflow-x: hidden;
+      display: flex;
+      flex-direction: column;
     }
 
     body.login-mode {
@@ -179,10 +185,14 @@
     /* Layout */
     #app-screen {
       min-height: 100vh;
+      height: 100vh;
       background:
         radial-gradient(circle at 20% 15%, rgba(0, 168, 132, 0.12), transparent 40%),
         radial-gradient(circle at 78% 10%, rgba(0, 168, 132, 0.08), transparent 42%),
         linear-gradient(180deg, #0b141a 0%, #111b21 60%, #0b141a 100%);
+      display: flex;
+      flex-direction: column;
+      flex: 1;
     }
 
     .sidebar {
@@ -472,14 +482,43 @@
       color: var(--accent);
     }
 
+/* Modal alinhado ao tema */
+.themed-modal {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
+.themed-modal .modal-header,
+.themed-modal .modal-footer {
+  border-color: var(--border);
+}
+
+.themed-modal .modal-title {
+  color: var(--text);
+}
+
+.themed-modal .btn-close {
+  filter: invert(1) brightness(1.1);
+  opacity: 0.85;
+}
+
+.themed-modal .btn-close:hover {
+  opacity: 1;
+}
+
 /* Footer fixado ao rodapé */
 #app-screen .row.g-0 {
-  min-height: 100vh;
+  min-height: 100%;
+  height: 100%;
+  flex: 1;
 }
 
 main {
   display: flex;
   flex-direction: column;
+  flex: 1;
   min-height: 100vh;
 }
 

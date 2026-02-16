@@ -78,28 +78,6 @@
           </div>
         </div>
 
-        <div class="card-panel mb-4 animate">
-          <div class="row g-3">
-            <div class="col-md-5 d-flex flex-column align-items-center" id="qr-column">
-              <div class="w-100 d-flex justify-content-center align-items-center"
-                style="min-height:220px; border:1px dashed var(--border); border-radius:12px;">
-                <img id="qr-preview" class="qr-preview" alt="QR Code" />
-                <div id="qr-skeleton"
-                  style="width:120px;height:120px;border-radius:12px;background:linear-gradient(90deg,#eef1f8 0%,#f7f8fb 50%,#eef1f8 100%);background-size:200% 100%;animation: shimmer 1.3s ease-in-out infinite;">
-                </div>
-              </div>
-              <div class="mt-3 d-flex gap-2">
-                <button class="btn btn-primary" id="open-qr" disabled><i class="bi bi-arrows-fullscreen me-1"></i> Abrir
-                  QR</button>
-                <button class="btn btn-outline-secondary" id="refresh-small"><i class="bi bi-arrow-repeat"></i></button>
-              </div>
-            </div>
-            <div class="col-md-7">
-              <h6 class="fw-bold mb-2">Logs em tempo real</h6>
-              <div class="log-box" id="log-box"></div>
-            </div>
-          </div>
-        </div>
 
         <footer class="py-3 mt-4 footer-area border-top">
           <div class="container">
@@ -127,7 +105,7 @@
   <!-- MODAL QR -->
   <div class="modal fade" id="qrModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content">
+      <div class="modal-content themed-modal">
         <div class="modal-header">
           <h5 class="modal-title">Escaneie o QR Code</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
@@ -146,7 +124,7 @@
   <!-- MODAL SOBRE -->
   <div class="modal fade" id="aboutModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content" style="background: var(--panel); color: var(--text); border:1px solid var(--border);">
+      <div class="modal-content themed-modal">
         <div class="modal-header">
           <h5 class="modal-title"><i class="bi bi-info-circle me-2"></i>Sobre Nós</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
@@ -171,7 +149,6 @@
     const statusPill = document.getElementById('status-pill');
     const connectedName = document.getElementById('connected-name');
     const refreshBtn = document.getElementById('refresh');
-    const refreshSmallBtn = document.getElementById('refresh-small');
     const refreshModalBtn = document.getElementById('refresh-modal');
     const disconnectBtn = document.getElementById('disconnect');
     const clearCacheBtn = document.getElementById('clear-cache');
@@ -180,9 +157,6 @@
 
     const qrModal = new bootstrap.Modal(document.getElementById('qrModal'));
     const qrImg = document.getElementById('qr');
-    const qrPreview = document.getElementById('qr-preview');
-    const qrSkeleton = document.getElementById('qr-skeleton');
-    const openQrBtn = document.getElementById('open-qr');
     const logBox = document.getElementById('log-box');
     const instancesTable = document.getElementById('instances-table');
     const loader = document.getElementById('app-loader');
@@ -227,10 +201,27 @@
     apiDocsBtn?.addEventListener('click', (ev) => { ev.preventDefault(); window.open('/api-docs', '_blank'); });
     document.getElementById('footer-about')?.addEventListener('click', (ev) => { ev.preventDefault(); aboutModal.show(); });
 
-    refreshBtn.addEventListener('click', () => { addLog('Solicitando novo QR'); loadQR(true); });
-    refreshSmallBtn.addEventListener('click', () => { addLog('Solicitando novo QR'); loadQR(true); });
-    refreshModalBtn.addEventListener('click', () => { addLog('Solicitando novo QR'); loadQR(true); });
-    openQrBtn.addEventListener('click', () => { if (lastQr) qrModal.show(); });
+    function showConnectedWarning() {
+      const msg = 'Instância conectada. Não é necessário gerar novo QR.';
+      addLog(msg);
+      alert(msg);
+    }
+
+    function handleGenerateQrClick() {
+      if (lastConnected) {
+        showConnectedWarning();
+        return;
+      }
+      addLog('Solicitando novo QR');
+      if (lastQr) {
+        qrImg.src = lastQr;
+      }
+      qrModal.show();
+      loadQR(true);
+    }
+
+    refreshBtn.addEventListener('click', handleGenerateQrClick);
+    refreshModalBtn.addEventListener('click', handleGenerateQrClick);
 
     disconnectBtn.addEventListener('click', async () => {
       const res = await fetch('/api/disconnect', { method: 'POST', headers: withToken() });
@@ -289,20 +280,10 @@
 
     function addLog(msg) {
       const line = `[${new Date().toLocaleTimeString('pt-BR')}] ${msg}`;
+      console.log(line);
+      if (!logBox) return;
       logBox.textContent = (logBox.textContent + '\n' + line).trim();
       logBox.scrollTop = logBox.scrollHeight;
-    }
-
-    function showSkeleton(show) { qrSkeleton?.classList.toggle('hidden', !show); }
-    function togglePreview(show) {
-      if (show) { qrPreview.style.display = 'block'; openQrBtn.removeAttribute('disabled'); }
-      else { qrPreview.style.display = 'none'; openQrBtn.setAttribute('disabled', 'disabled'); }
-    }
-
-    function toggleQrColumn(show) {
-      const col = document.getElementById('qr-column');
-      if (!col) return;
-      col.classList.toggle('d-none', !show);
     }
 
     function startPolling() {
@@ -321,8 +302,7 @@
     function hideLoader() { loader?.classList.add('hidden'); }
 
     async function loadQR(forceLog = false) {
-      if (!apiToken) { showSkeleton(false); togglePreview(false); hideLoader(); return; }
-      showSkeleton(true);
+      if (!apiToken) { hideLoader(); return; }
       try {
         const res = await fetch('/api/qr', { headers: withToken() });
         if (res.status === 401) { clearToken(); stopPolling(); redirectToLogin(); return; }
@@ -346,26 +326,19 @@
           statusPill.textContent = 'INSTANCIA CONECTADA';
           statusPill.className = 'status-badge status-connected';
           connectedName.textContent = name || '-';
-          togglePreview(false);
-          showSkeleton(false);
-          toggleQrColumn(false);
+          lastQr = null;
+          qrModal.hide();
         } else if (data.qrDataUrl) {
           statusPill.textContent = 'AGUARDANDO CONECTAR';
           statusPill.className = 'status-badge status-waiting';
           qrImg.src = data.qrDataUrl;
-          qrPreview.src = data.qrDataUrl;
           lastQr = data.qrDataUrl;
-          togglePreview(true);
-          showSkeleton(false);
           connectedName.textContent = '-';
-          toggleQrColumn(true);
         } else {
           statusPill.textContent = 'INSTANCIA DESCONECTADA';
           statusPill.className = 'status-badge status-disconnected';
-          togglePreview(false);
-          showSkeleton(true);
+          lastQr = null;
           connectedName.textContent = '-';
-          toggleQrColumn(true);
         }
         hideLoader();
       } catch (err) {
