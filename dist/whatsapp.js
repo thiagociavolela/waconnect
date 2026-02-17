@@ -4,7 +4,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.WhatsAppService = void 0;
-const p_queue_1 = __importDefault(require("p-queue"));
 const path_1 = __importDefault(require("path"));
 const promises_1 = __importDefault(require("fs/promises"));
 const google_tts_api_1 = require("google-tts-api");
@@ -15,7 +14,7 @@ class WhatsAppService {
         this.connecting = false;
         this.connected = false;
         this.authFolder = path_1.default.join(process.cwd(), "auth");
-        this.queue = new p_queue_1.default({ concurrency: 3 });
+        this.queuePromise = null;
         this.lastSendByJid = new Map();
         this.baileysModule = null;
         void this.start();
@@ -39,6 +38,14 @@ class WhatsAppService {
             this.baileysModule = dynamicImport("@whiskeysockets/baileys");
         }
         return this.baileysModule;
+    }
+    loadQueue() {
+        if (!this.queuePromise) {
+            // usa import dinâmico real para não depender de require() em módulo ESM
+            const dynamicImport = new Function("specifier", "return import(specifier);");
+            this.queuePromise = dynamicImport("p-queue").then((mod) => new mod.default({ concurrency: 3 }));
+        }
+        return this.queuePromise;
     }
     get status() {
         return {
@@ -152,7 +159,8 @@ class WhatsAppService {
         return this.socket;
     }
     async scheduleSend(jid, fn) {
-        return this.queue.add(async () => {
+        const queue = await this.loadQueue();
+        return queue.add(async () => {
             const now = Date.now();
             const last = this.lastSendByJid.get(jid) ?? 0;
             const baseGap = 1500; // 1.5s entre mensagens para o mesmo destino

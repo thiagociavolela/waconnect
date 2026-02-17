@@ -32,12 +32,13 @@ export declare class WhatsAppService {
     private meJid;
     private pushName;
     private profilePicUrl;
-    private queue;
+    private queuePromise;
     private lastSendByJid;
     constructor();
     private baileysModule;
     private loadProfilePic;
     private loadBaileys;
+    private loadQueue;
     get status(): {
         connected: boolean;
         me: string | undefined;

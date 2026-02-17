@@ -1,7 +1,7 @@
 import type { AnyMessageContent, Browsers, WAMessageKey, WASocket, WAUrlInfo } from "@whiskeysockets/baileys";
 import { fetchLatestBaileysVersion, useMultiFileAuthState } from "@whiskeysockets/baileys";
 import { Boom } from "@hapi/boom";
-import PQueue from "p-queue";
+import type PQueue from "p-queue";
 import path from "path";
 import fs from "fs/promises";
 import { getAudioUrl } from "google-tts-api";
@@ -44,7 +44,7 @@ export class WhatsAppService {
   private meJid: string | undefined;
   private pushName: string | undefined;
   private profilePicUrl: string | undefined;
-  private queue = new PQueue({ concurrency: 3 });
+  private queuePromise: Promise<PQueue> | null = null;
   private lastSendByJid = new Map<string, number>();
 
   constructor() {
@@ -73,6 +73,17 @@ export class WhatsAppService {
       this.baileysModule = dynamicImport("@whiskeysockets/baileys");
     }
     return this.baileysModule;
+  }
+
+  private loadQueue(): Promise<PQueue> {
+    if (!this.queuePromise) {
+      // usa import dinâmico real para não depender de require() em módulo ESM
+      const dynamicImport = new Function("specifier", "return import(specifier);") as (
+        s: string
+      ) => Promise<typeof import("p-queue")>;
+      this.queuePromise = dynamicImport("p-queue").then((mod) => new mod.default({ concurrency: 3 }));
+    }
+    return this.queuePromise;
   }
 
   get status() {
@@ -197,7 +208,8 @@ export class WhatsAppService {
   }
 
   private async scheduleSend<T>(jid: string, fn: () => Promise<T>): Promise<T> {
-    return this.queue.add<T>(
+    const queue = await this.loadQueue();
+    return queue.add<T>(
       async () => {
         const now = Date.now();
         const last = this.lastSendByJid.get(jid) ?? 0;
