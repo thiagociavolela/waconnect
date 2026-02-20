@@ -3,6 +3,8 @@ export type MediaKind = "image" | "video" | "audio" | "document";
 export interface SendTextPayload {
     to: string;
     message: string;
+    /** Delay desejado em segundos entre mensagens. Mínimo aplicado: 3s. */
+    delaySeconds?: number;
 }
 export interface SendMediaPayload {
     to: string;
@@ -33,6 +35,7 @@ export declare class WhatsAppService {
     private pushName;
     private profilePicUrl;
     private queuePromise;
+    private lastSendAt;
     private lastSendByJid;
     constructor();
     private baileysModule;
@@ -66,7 +69,7 @@ export declare class WhatsAppService {
      */
     private normalizeBrazilNumber;
     private formatJid;
-    sendText({ to, message }: SendTextPayload): Promise<WAMessageKey>;
+    sendText({ to, message, delaySeconds }: SendTextPayload): Promise<WAMessageKey>;
     sendMedia({ to, buffer, kind, mimetype, fileName, caption }: SendMediaPayload): Promise<WAMessageKey>;
     sendContact({ to, name, phone }: SendContactPayload): Promise<WAMessageKey>;
     sendNarration({ to, text, lang, slow }: SendNarrationPayload): Promise<WAMessageKey>;

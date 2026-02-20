@@ -11,6 +11,8 @@ export type MediaKind = "image" | "video" | "audio" | "document";
 export interface SendTextPayload {
   to: string;
   message: string;
+  /** Delay desejado em segundos entre mensagens. Mínimo aplicado: 3s. */
+  delaySeconds?: number;
 }
 
 export interface SendMediaPayload {
@@ -45,6 +47,8 @@ export class WhatsAppService {
   private pushName: string | undefined;
   private profilePicUrl: string | undefined;
   private queuePromise: Promise<PQueue> | null = null;
+  // último envio global (qualquer destinatário) para garantir espaçamento mínimo
+  private lastSendAt = 0;
   private lastSendByJid = new Map<string, number>();
 
   constructor() {
@@ -81,7 +85,8 @@ export class WhatsAppService {
       const dynamicImport = new Function("specifier", "return import(specifier);") as (
         s: string
       ) => Promise<typeof import("p-queue")>;
-      this.queuePromise = dynamicImport("p-queue").then((mod) => new mod.default({ concurrency: 3 }));
+      // concurrency 1 força fila global, evitando envios simultâneos
+      this.queuePromise = dynamicImport("p-queue").then((mod) => new mod.default({ concurrency: 1 }));
     }
     return this.queuePromise;
   }
@@ -207,20 +212,21 @@ export class WhatsAppService {
     return this.socket;
   }
 
-  private async scheduleSend<T>(jid: string, fn: () => Promise<T>): Promise<T> {
+  private async scheduleSend<T>(jid: string, fn: () => Promise<T>, requestedDelayMs = 3000): Promise<T> {
     const queue = await this.loadQueue();
     return queue.add<T>(
       async () => {
+        const jitter = Math.floor(Math.random() * 500); // ruído para evitar padrão fixo
+        const minGap = Math.max(3000, requestedDelayMs); // mínimo absoluto 3s
         const now = Date.now();
-        const last = this.lastSendByJid.get(jid) ?? 0;
-        const baseGap = 1500; // 1.5s entre mensagens para o mesmo destino
-        const jitter = Math.floor(Math.random() * 700); // +0-700ms para evitar padrão robótico
-        const waitMs = Math.max(0, last + baseGap + jitter - now);
-        if (waitMs > 0) {
-          await new Promise((resolve) => setTimeout(resolve, waitMs));
-        }
+        const nextAllowed = this.lastSendAt + minGap;
+        // aguarda sempre pelo menos minGap antes de enviar, e respeita espaçamento entre mensagens
+        const waitMs = Math.max(minGap, nextAllowed - now) + jitter;
+        await new Promise((resolve) => setTimeout(resolve, waitMs));
         const result = await fn();
-        this.lastSendByJid.set(jid, Date.now());
+        const sentAt = Date.now();
+        this.lastSendAt = sentAt;
+        this.lastSendByJid.set(jid, sentAt);
         return result;
       },
       { throwOnTimeout: true }
@@ -260,34 +266,38 @@ export class WhatsAppService {
     return `${formatted}@s.whatsapp.net`;
   }
 
-  async sendText({ to, message }: SendTextPayload) {
+  async sendText({ to, message, delaySeconds }: SendTextPayload) {
     const jid = this.formatJid(to);
-    return this.scheduleSend(jid, () =>
-      this.withRetry(async () => {
-        const baileys = await this.loadBaileys();
-        const sock = this.assertSocket();
-        let linkPreview: WAUrlInfo | undefined;
-        const hasUrl = /(https?:\/\/[^\s]+)/i.test(message);
-        if (hasUrl) {
-          try {
-            linkPreview = await baileys.getUrlInfo(message, {
-              thumbnailWidth: 192,
-              fetchOpts: {
-                timeout: 8000,
-                headers: {
-                  "User-Agent":
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121 Safari/537.36"
+    const requestedDelayMs = Number.isFinite(delaySeconds) ? (delaySeconds as number) * 1000 : 3000;
+    return this.scheduleSend(
+      jid,
+      () =>
+        this.withRetry(async () => {
+          const baileys = await this.loadBaileys();
+          const sock = this.assertSocket();
+          let linkPreview: WAUrlInfo | undefined;
+          const hasUrl = /(https?:\/\/[^\s]+)/i.test(message);
+          if (hasUrl) {
+            try {
+              linkPreview = await baileys.getUrlInfo(message, {
+                thumbnailWidth: 192,
+                fetchOpts: {
+                  timeout: 8000,
+                  headers: {
+                    "User-Agent":
+                      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121 Safari/537.36"
+                  }
                 }
-              }
-            });
-          } catch (err) {
-            console.warn("Falha ao gerar link preview", err);
+              });
+            } catch (err) {
+              console.warn("Falha ao gerar link preview", err);
+            }
           }
-        }
-        const content: AnyMessageContent = linkPreview ? { text: message, linkPreview } : { text: message };
-        const result = await sock.sendMessage(jid, content);
-        return result?.key as WAMessageKey;
-      })
+          const content: AnyMessageContent = linkPreview ? { text: message, linkPreview } : { text: message };
+          const result = await sock.sendMessage(jid, content);
+          return result?.key as WAMessageKey;
+        }),
+      requestedDelayMs
     );
   }
 

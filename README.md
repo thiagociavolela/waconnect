@@ -46,7 +46,7 @@ Enviar o header `x-api-token: <API_TOKEN>` em todas as rotas `/api/*`.
 - `POST /api/clear-cache` — limpa cache/auth sem reiniciar.
 - `GET /api/status` — status da instância.
 - `POST /api/check-number` — verifica se número é WhatsApp.
-- `POST /api/send/text` — envia texto `{ to, message }`.
+- `POST /api/send/text` — envia texto `{ to, message, delay? }` (delay em segundos, mínimo 3s; padrão 3s).
 - `POST /api/send/media` — envia mídia multipart form-data (`file`, `to`, `kind?`, `caption?`).
 - `POST /api/send/contact` — envia vCard `{ to, name, phone }`.
 - `POST /api/send/narration` — gera TTS (Google TTS) e envia áudio `{ to, text, lang?, slow? }`.
@@ -56,7 +56,7 @@ Enviar o header `x-api-token: <API_TOKEN>` em todas as rotas `/api/*`.
 curl -X POST http://localhost:3000/api/send/text \
   -H "Content-Type: application/json" \
   -H "x-api-token: $API_TOKEN" \
-  -d '{ "to":"5599999999999", "message":"Olá do WaConnect!" }'
+  -d '{ "to":"5599999999999", "message":"Olá do WaConnect!", "delay": 4 }'
 ```
 
 ## Documentação Swagger

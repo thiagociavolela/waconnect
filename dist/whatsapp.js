@@ -15,6 +15,8 @@ class WhatsAppService {
         this.connected = false;
         this.authFolder = path_1.default.join(process.cwd(), "auth");
         this.queuePromise = null;
+        // último envio global (qualquer destinatário) para garantir espaçamento mínimo
+        this.lastSendAt = 0;
         this.lastSendByJid = new Map();
         this.baileysModule = null;
         void this.start();
@@ -43,7 +45,8 @@ class WhatsAppService {
         if (!this.queuePromise) {
             // usa import dinâmico real para não depender de require() em módulo ESM
             const dynamicImport = new Function("specifier", "return import(specifier);");
-            this.queuePromise = dynamicImport("p-queue").then((mod) => new mod.default({ concurrency: 3 }));
+            // concurrency 1 força fila global, evitando envios simultâneos
+            this.queuePromise = dynamicImport("p-queue").then((mod) => new mod.default({ concurrency: 1 }));
         }
         return this.queuePromise;
     }
@@ -158,19 +161,20 @@ class WhatsAppService {
             throw new Error("WhatsApp socket not initialized");
         return this.socket;
     }
-    async scheduleSend(jid, fn) {
+    async scheduleSend(jid, fn, requestedDelayMs = 3000) {
         const queue = await this.loadQueue();
         return queue.add(async () => {
+            const jitter = Math.floor(Math.random() * 500); // ruído para evitar padrão fixo
+            const minGap = Math.max(3000, requestedDelayMs); // mínimo absoluto 3s
             const now = Date.now();
-            const last = this.lastSendByJid.get(jid) ?? 0;
-            const baseGap = 1500; // 1.5s entre mensagens para o mesmo destino
-            const jitter = Math.floor(Math.random() * 700); // +0-700ms para evitar padrão robótico
-            const waitMs = Math.max(0, last + baseGap + jitter - now);
-            if (waitMs > 0) {
-                await new Promise((resolve) => setTimeout(resolve, waitMs));
-            }
+            const nextAllowed = this.lastSendAt + minGap;
+            // aguarda sempre pelo menos minGap antes de enviar, e respeita espaçamento entre mensagens
+            const waitMs = Math.max(minGap, nextAllowed - now) + jitter;
+            await new Promise((resolve) => setTimeout(resolve, waitMs));
             const result = await fn();
-            this.lastSendByJid.set(jid, Date.now());
+            const sentAt = Date.now();
+            this.lastSendAt = sentAt;
+            this.lastSendByJid.set(jid, sentAt);
             return result;
         }, { throwOnTimeout: true });
     }
@@ -204,8 +208,9 @@ class WhatsAppService {
         const { formatted } = this.normalizeBrazilNumber(normalized);
         return `${formatted}@s.whatsapp.net`;
     }
-    async sendText({ to, message }) {
+    async sendText({ to, message, delaySeconds }) {
         const jid = this.formatJid(to);
+        const requestedDelayMs = Number.isFinite(delaySeconds) ? delaySeconds * 1000 : 3000;
         return this.scheduleSend(jid, () => this.withRetry(async () => {
             const baileys = await this.loadBaileys();
             const sock = this.assertSocket();
@@ -230,7 +235,7 @@ class WhatsAppService {
             const content = linkPreview ? { text: message, linkPreview } : { text: message };
             const result = await sock.sendMessage(jid, content);
             return result?.key;
-        }));
+        }), requestedDelayMs);
     }
     async sendMedia({ to, buffer, kind, mimetype, fileName, caption }) {
         const jid = this.formatJid(to);

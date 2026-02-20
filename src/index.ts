@@ -63,7 +63,13 @@ const swaggerOptions: SwaggerOptions = {
           required: ["to", "message"],
           properties: {
             to: { type: "string", example: "5599999999999" },
-            message: { type: "string", example: "Olá!" }
+            message: { type: "string", example: "Olá!" },
+            delay: {
+              type: "number",
+              minimum: 3,
+              example: 3,
+              description: "Delay em segundos entre envios. Mínimo 3s; padrão 3s se omitido."
+            }
           }
         },
         SendContactRequest: {
@@ -329,15 +335,21 @@ app.post("/api/check-number", async (req: Request, res: Response) => {
 });
 
 app.post("/api/send/text", async (req: Request, res: Response) => {
-  const { to, message } = req.body;
+  const { to, message, delay } = req.body;
   const idemKey = getIdemKey(req);
   if (idemKey && replyIfCached(idemKey, res)) return;
   if (!to || !message) {
     return res.status(400).json({ error: "Campos 'to' e 'message' são obrigatórios." });
   }
+  const delaySeconds = delay !== undefined ? Number(delay) : undefined;
+  if (delaySeconds !== undefined && Number.isNaN(delaySeconds)) {
+    return res.status(400).json({ error: "Campo 'delay' deve ser numérico (segundos)." });
+  }
+  const clampedDelay = delaySeconds !== undefined ? Math.max(3, delaySeconds) : undefined;
 
   try {
-    const key = await whatsapp.sendText({ to, message });
+    const payload = clampedDelay !== undefined ? { to, message, delaySeconds: clampedDelay } : { to, message };
+    const key = await whatsapp.sendText(payload);
     cacheIdem(idemKey, res, { success: true, key });
   } catch (err) {
     console.error(err);
