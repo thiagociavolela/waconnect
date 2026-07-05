@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const cors_1 = __importDefault(require("cors"));
 const express_1 = __importDefault(require("express"));
+const crypto_1 = __importDefault(require("crypto"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const multer_1 = __importDefault(require("multer"));
 const qrcode_1 = __importDefault(require("qrcode"));
@@ -18,11 +19,18 @@ const PORT = process.env.PORT || 3000;
 const SERVER_URL = process.env.SERVER_URL ?? `http://localhost:${PORT}`;
 const DASH_USER = process.env.DASH_USER ?? "admin";
 const DASH_PASS = process.env.DASH_PASS ?? "admin123";
+const rawApiToken = process.env.API_TOKEN?.trim();
+if (!rawApiToken) {
+    throw new Error("API_TOKEN is required to start the server.");
+}
+const API_TOKEN = rawApiToken;
+const DASH_SESSION_COOKIE = "dash_session";
+const DASH_SESSION_TTL_MS = 1000 * 60 * 60 * 12;
+const dashboardSessions = new Map();
 const upload = (0, multer_1.default)({
     storage: multer_1.default.memoryStorage(),
     limits: { fileSize: 25 * 1024 * 1024 } // 25 MB cap for media
 });
-const API_TOKEN = process.env.API_TOKEN ?? "";
 const IDEM_TTL_MS = 5 * 60 * 1000;
 const idempotencyCache = new Map();
 const rateWindowMs = 1000;
@@ -256,11 +264,11 @@ const swaggerSpec = (0, swagger_jsdoc_1.default)(swaggerOptions);
 app.use("/api-docs", swagger_ui_express_1.default.serve, swagger_ui_express_1.default.setup(swaggerSpec));
 app.get("/api-docs.json", (_req, res) => res.json(swaggerSpec));
 function authGuard(req, res, next) {
-    if (!API_TOKEN)
-        return next(); // Sem token configurado, segue.
     const headerToken = req.headers["x-api-token"] ||
         (req.headers.authorization?.replace(/^Bearer\s+/i, "") ?? "");
     if (headerToken && headerToken === API_TOKEN)
+        return next();
+    if (hasValidDashboardSession(req))
         return next();
     return res.status(401).json({ error: "Token inválido ou ausente." });
 }
@@ -269,9 +277,19 @@ app.use("/api/send", rateLimiter);
 app.post("/login", (req, res) => {
     const { user, pass } = req.body;
     if (user === DASH_USER && pass === DASH_PASS) {
-        return res.json({ token: API_TOKEN, user });
+        const sessionId = createDashboardSession(user);
+        setDashboardSessionCookie(res, sessionId);
+        return res.json({ success: true, user });
     }
     return res.status(401).json({ error: "Credenciais inválidas." });
+});
+app.post("/logout", (req, res) => {
+    const sessionId = getCookieValue(req, DASH_SESSION_COOKIE);
+    if (sessionId) {
+        dashboardSessions.delete(sessionId);
+    }
+    clearDashboardSessionCookie(res);
+    res.json({ success: true });
 });
 app.get("/api/qr", async (_req, res) => {
     const status = whatsapp.status;
@@ -436,5 +454,50 @@ function cacheIdem(key, res, body, status = 200) {
         idempotencyCache.set(key, { status, body, expiresAt: Date.now() + IDEM_TTL_MS });
     }
     res.status(status).json(body);
+}
+function createDashboardSession(user) {
+    const sessionId = crypto_1.default.randomBytes(32).toString("hex");
+    dashboardSessions.set(sessionId, { user, expiresAt: Date.now() + DASH_SESSION_TTL_MS });
+    return sessionId;
+}
+function hasValidDashboardSession(req) {
+    const sessionId = getCookieValue(req, DASH_SESSION_COOKIE);
+    if (!sessionId)
+        return false;
+    const session = dashboardSessions.get(sessionId);
+    if (!session)
+        return false;
+    if (session.expiresAt <= Date.now()) {
+        dashboardSessions.delete(sessionId);
+        return false;
+    }
+    return true;
+}
+function getCookieValue(req, name) {
+    const cookieHeader = req.headers.cookie;
+    if (!cookieHeader)
+        return null;
+    const cookies = cookieHeader.split(";").map((item) => item.trim());
+    const cookie = cookies.find((item) => item.startsWith(`${name}=`));
+    if (!cookie)
+        return null;
+    return decodeURIComponent(cookie.slice(name.length + 1));
+}
+function setDashboardSessionCookie(res, sessionId) {
+    res.cookie(DASH_SESSION_COOKIE, sessionId, {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        maxAge: DASH_SESSION_TTL_MS,
+        path: "/"
+    });
+}
+function clearDashboardSessionCookie(res) {
+    res.clearCookie(DASH_SESSION_COOKIE, {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        path: "/"
+    });
 }
 //# sourceMappingURL=index.js.map

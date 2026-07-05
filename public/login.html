@@ -37,18 +37,13 @@
   </div>
 
   <script>
-    const COOKIE_NAME = 'api_token';
     const INDEX_PAGE = '/';
     const loginForm = document.getElementById('login-form');
     const loginLog = document.getElementById('login-log');
     const userInput = document.getElementById('user');
     const passInput = document.getElementById('pass');
 
-    // Se já tiver token salvo, redireciona direto para o app
-    const saved = localStorage.getItem('api_token') || readCookie(COOKIE_NAME);
-    if (saved) {
-      window.location.href = INDEX_PAGE;
-    }
+    void ensureSession();
 
     loginForm.addEventListener('submit', async (ev) => {
       ev.preventDefault();
@@ -63,8 +58,7 @@
           body: JSON.stringify({ user, pass })
         });
         const data = await res.json();
-        if (res.ok && data.token) {
-          setSessionToken(data.token);
+        if (res.ok && data.success) {
           window.location.href = INDEX_PAGE;
         } else {
           showError(data.error || `Login falhou (status ${res.status}).`);
@@ -74,15 +68,15 @@
       }
     });
 
-    function setSessionToken(token) {
-      localStorage.setItem('api_token', token);
-      document.cookie = `${COOKIE_NAME}=${token}; max-age=${60 * 60 * 24 * 30}; path=/;`;
-    }
-
-    function readCookie(name) {
-      const cookies = document.cookie.split(';').map((c) => c.trim());
-      const found = cookies.find((c) => c.startsWith(name + '='));
-      return found ? decodeURIComponent(found.split('=')[1]) : null;
+    async function ensureSession() {
+      try {
+        const res = await fetch('/api/status');
+        if (res.ok) {
+          window.location.href = INDEX_PAGE;
+        }
+      } catch (err) {
+        console.error(err);
+      }
     }
 
     function showError(msg) {

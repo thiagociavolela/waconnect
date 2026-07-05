@@ -179,24 +179,10 @@ class WhatsAppService {
         }, { throwOnTimeout: true });
     }
     /**
-     * Ajusta números brasileiros que podem estar sem o 9º dígito nos celulares.
-     * Se vier com DDI 55 + DDD + 8 dígitos iniciando em 6–9, insere o 9.
+     * Remove caracteres especiais e mantém apenas dígitos para números sem JID.
      */
-    normalizeBrazilNumber(raw) {
-        let digits = raw.replace(/\D/g, "");
-        let addedNine = false;
-        if (digits.startsWith("55")) {
-            const rest = digits.slice(2); // DDD + número
-            if (rest.length === 10) {
-                const ddd = rest.slice(0, 2);
-                const local = rest.slice(2);
-                if (/^[6-9]/.test(local)) {
-                    digits = `55${ddd}9${local}`;
-                    addedNine = true;
-                }
-            }
-        }
-        return { formatted: digits, addedNine };
+    normalizeNumber(raw) {
+        return raw.replace(/\D/g, "");
     }
     formatJid(raw) {
         const normalized = raw.replace(/\s|-/g, "");
@@ -205,8 +191,7 @@ class WhatsAppService {
         }
         if (normalized.includes("@"))
             return normalized;
-        const { formatted } = this.normalizeBrazilNumber(normalized);
-        return `${formatted}@s.whatsapp.net`;
+        return `${this.normalizeNumber(normalized)}@s.whatsapp.net`;
     }
     async sendText({ to, message, delaySeconds }) {
         const jid = this.formatJid(to);

@@ -64,10 +64,9 @@ export declare class WhatsAppService {
     private assertSocket;
     private scheduleSend;
     /**
-     * Ajusta números brasileiros que podem estar sem o 9º dígito nos celulares.
-     * Se vier com DDI 55 + DDD + 8 dígitos iniciando em 6–9, insere o 9.
+     * Remove caracteres especiais e mantém apenas dígitos para números sem JID.
      */
-    private normalizeBrazilNumber;
+    private normalizeNumber;
     private formatJid;
     sendText({ to, message, delaySeconds }: SendTextPayload): Promise<WAMessageKey>;
     sendMedia({ to, buffer, kind, mimetype, fileName, caption }: SendMediaPayload): Promise<WAMessageKey>;

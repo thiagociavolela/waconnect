@@ -1,5 +1,6 @@
 import cors from "cors";
 import express, { Request, Response } from "express";
+import crypto from "crypto";
 import dotenv from "dotenv";
 import multer from "multer";
 import QRCode from "qrcode";
@@ -17,12 +18,22 @@ const PORT = process.env.PORT || 3000;
 const SERVER_URL = process.env.SERVER_URL ?? `http://localhost:${PORT}`;
 const DASH_USER = process.env.DASH_USER ?? "admin";
 const DASH_PASS = process.env.DASH_PASS ?? "admin123";
+const rawApiToken = process.env.API_TOKEN?.trim();
+
+if (!rawApiToken) {
+  throw new Error("API_TOKEN is required to start the server.");
+}
+
+const API_TOKEN = rawApiToken;
+const DASH_SESSION_COOKIE = "dash_session";
+const DASH_SESSION_TTL_MS = 1000 * 60 * 60 * 12;
+const dashboardSessions = new Map<string, { user: string; expiresAt: number }>();
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 25 * 1024 * 1024 } // 25 MB cap for media
 });
 
-const API_TOKEN = process.env.API_TOKEN ?? "";
 const IDEM_TTL_MS = 5 * 60 * 1000;
 const idempotencyCache = new Map<string, CachedResponse>();
 const rateWindowMs = 1000;
@@ -262,13 +273,12 @@ app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.get("/api-docs.json", (_req, res) => res.json(swaggerSpec));
 
 function authGuard(req: Request, res: Response, next: () => void) {
-  if (!API_TOKEN) return next(); // Sem token configurado, segue.
-
   const headerToken =
     (req.headers["x-api-token"] as string | undefined) ||
     (req.headers.authorization?.replace(/^Bearer\s+/i, "") ?? "");
 
   if (headerToken && headerToken === API_TOKEN) return next();
+  if (hasValidDashboardSession(req)) return next();
   return res.status(401).json({ error: "Token inválido ou ausente." });
 }
 
@@ -278,9 +288,20 @@ app.use("/api/send", rateLimiter);
 app.post("/login", (req: Request, res: Response) => {
   const { user, pass } = req.body;
   if (user === DASH_USER && pass === DASH_PASS) {
-    return res.json({ token: API_TOKEN, user });
+    const sessionId = createDashboardSession(user);
+    setDashboardSessionCookie(res, sessionId);
+    return res.json({ success: true, user });
   }
   return res.status(401).json({ error: "Credenciais inválidas." });
+});
+
+app.post("/logout", (req: Request, res: Response) => {
+  const sessionId = getCookieValue(req, DASH_SESSION_COOKIE);
+  if (sessionId) {
+    dashboardSessions.delete(sessionId);
+  }
+  clearDashboardSessionCookie(res);
+  res.json({ success: true });
 });
 
 app.get("/api/qr", async (_req: Request, res: Response) => {
@@ -459,4 +480,55 @@ function cacheIdem(key: string | null, res: Response, body: unknown, status = 20
     idempotencyCache.set(key, { status, body, expiresAt: Date.now() + IDEM_TTL_MS });
   }
   res.status(status).json(body);
+}
+
+function createDashboardSession(user: string): string {
+  const sessionId = crypto.randomBytes(32).toString("hex");
+  dashboardSessions.set(sessionId, { user, expiresAt: Date.now() + DASH_SESSION_TTL_MS });
+  return sessionId;
+}
+
+function hasValidDashboardSession(req: Request): boolean {
+  const sessionId = getCookieValue(req, DASH_SESSION_COOKIE);
+  if (!sessionId) return false;
+
+  const session = dashboardSessions.get(sessionId);
+  if (!session) return false;
+
+  if (session.expiresAt <= Date.now()) {
+    dashboardSessions.delete(sessionId);
+    return false;
+  }
+
+  return true;
+}
+
+function getCookieValue(req: Request, name: string): string | null {
+  const cookieHeader = req.headers.cookie;
+  if (!cookieHeader) return null;
+
+  const cookies = cookieHeader.split(";").map((item) => item.trim());
+  const cookie = cookies.find((item) => item.startsWith(`${name}=`));
+  if (!cookie) return null;
+
+  return decodeURIComponent(cookie.slice(name.length + 1));
+}
+
+function setDashboardSessionCookie(res: Response, sessionId: string) {
+  res.cookie(DASH_SESSION_COOKIE, sessionId, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: DASH_SESSION_TTL_MS,
+    path: "/"
+  });
+}
+
+function clearDashboardSessionCookie(res: Response) {
+  res.clearCookie(DASH_SESSION_COOKIE, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/"
+  });
 }

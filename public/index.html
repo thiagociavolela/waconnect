@@ -162,9 +162,7 @@
     const animatables = document.querySelectorAll('.animate');
     const aboutModal = new bootstrap.Modal(document.getElementById('aboutModal'));
 
-    const COOKIE_NAME = 'api_token';
     const LOGIN_PAGE = '/login.html';
-    let apiToken = localStorage.getItem('api_token') || readCookie(COOKIE_NAME) || '';
     let pollInterval = null;
     let lastConnected = null;
     let lastQr = null;
@@ -223,58 +221,39 @@
     refreshModalBtn.addEventListener('click', handleGenerateQrClick);
 
     disconnectBtn.addEventListener('click', async () => {
-      const res = await fetch('/api/disconnect', { method: 'POST', headers: withToken() });
-      if (res.status === 401) { clearToken(); stopPolling(); redirectToLogin(); return; }
+      const res = await fetch('/api/disconnect', { method: 'POST' });
+      if (res.status === 401) { stopPolling(); redirectToLogin(); return; }
       addLog('Instância desconectada.');
       loadQR(true);
     });
 
     clearCacheBtn.addEventListener('click', async () => {
-      const res = await fetch('/api/clear-cache', { method: 'POST', headers: withToken() });
-      if (res.status === 401) { clearToken(); stopPolling(); redirectToLogin(); return; }
+      const res = await fetch('/api/clear-cache', { method: 'POST' });
+      if (res.status === 401) { stopPolling(); redirectToLogin(); return; }
       addLog('Cache limpo.');
       loadQR(true);
     });
 
-    logoutBtn.addEventListener('click', () => { clearToken(); stopPolling(); redirectToLogin(); });
+    logoutBtn.addEventListener('click', async () => {
+      try {
+        await fetch('/logout', { method: 'POST' });
+      } finally {
+        stopPolling();
+        redirectToLogin();
+      }
+    });
 
     function redirectToLogin() { window.location.href = LOGIN_PAGE; }
 
     async function ensureAuthAndStart() {
-      if (!apiToken) {
-        const cookieToken = readCookie(COOKIE_NAME);
-        if (cookieToken) {
-          apiToken = cookieToken;
-          localStorage.setItem('api_token', apiToken);
-        }
-      }
-      if (!apiToken) { redirectToLogin(); return; }
       try {
-        const res = await fetch('/api/status', { headers: withToken() });
-        if (res.status === 401) { clearToken(); redirectToLogin(); return; }
+        const res = await fetch('/api/status');
+        if (res.status === 401) { redirectToLogin(); return; }
         renderInstances();
         showLoader();
         startPolling();
         loadQR(true);
       } catch { redirectToLogin(); }
-    }
-
-    function setSessionToken(token) {
-      apiToken = token;
-      localStorage.setItem('api_token', token);
-      document.cookie = `${COOKIE_NAME}=${token}; max-age=${60 * 60 * 24 * 30}; path=/;`;
-    }
-
-    function clearToken() {
-      apiToken = '';
-      localStorage.removeItem('api_token');
-      document.cookie = `${COOKIE_NAME}=; Max-Age=0; path=/;`;
-    }
-    function withToken() { return apiToken ? { 'x-api-token': apiToken } : {}; }
-    function readCookie(name) {
-      const cookies = document.cookie.split(';').map((c) => c.trim());
-      const found = cookies.find((c) => c.startsWith(name + '='));
-      return found ? decodeURIComponent(found.split('=')[1]) : null;
     }
 
     function addLog(msg) {
@@ -287,7 +266,6 @@
 
     function startPolling() {
       if (pollInterval) return;
-      if (!apiToken) return;
       pollInterval = setInterval(() => loadQR(false), 3500);
     }
 
@@ -301,10 +279,9 @@
     function hideLoader() { loader?.classList.add('hidden'); }
 
     async function loadQR(forceLog = false) {
-      if (!apiToken) { hideLoader(); return; }
       try {
-        const res = await fetch('/api/qr', { headers: withToken() });
-        if (res.status === 401) { clearToken(); stopPolling(); redirectToLogin(); return; }
+        const res = await fetch('/api/qr');
+        if (res.status === 401) { stopPolling(); redirectToLogin(); return; }
         const data = await res.json();
 
         const connected = !!data.connected;
